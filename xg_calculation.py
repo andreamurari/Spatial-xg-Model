@@ -11,13 +11,13 @@ def main():
     print("Caricamento del dataset...")
     try:
         df_male = pd.read_csv("dataset_xg_spaziale_male.csv")
-        df_male = pd.get_dummies(df_male, columns=['body_part', 'shot_type'], drop_first=True)
+        df_male = pd.get_dummies(df_male, columns=['body_part', 'shot_type', 'shot_technique'], drop_first=True)
     except FileNotFoundError:
         print("Errore: Impossibile trovare 'dataset_xg_spaziale_male.csv'.")
         return
 
     # Feature e Target
-    exclude_cols = ['match_id', 'tiratore', 'goal']
+    exclude_cols = ['match_id', 'tiratore', 'goal', 'xG']
     features = [col for col in df_male.columns if col not in exclude_cols]
     target = 'goal'
 
