@@ -1,6 +1,7 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.metrics import log_loss, roc_auc_score, roc_curve, RocCurveDisplay
 from xgboost import XGBClassifier
 import warnings
 
@@ -10,12 +11,14 @@ def main():
     print("Caricamento del dataset...")
     try:
         df_male = pd.read_csv("dataset_xg_spaziale_male.csv")
+        df_male = pd.get_dummies(df_male, columns=['body_part', 'shot_type'], drop_first=True)
     except FileNotFoundError:
         print("Errore: Impossibile trovare 'dataset_xg_spaziale_male.csv'.")
         return
 
     # Feature e Target
-    features = ['distanza', 'angolo', 'difensori_cono', 'portiere_cono']
+    exclude_cols = ['match_id', 'tiratore', 'goal']
+    features = [col for col in df_male.columns if col not in exclude_cols]
     target = 'goal'
 
     X = df_male[features]
@@ -27,28 +30,23 @@ def main():
     )
 
     # 1. Definizione della Griglia dei Parametri da testare
-    # Qui diciamo a Python quali combinazioni provare
     param_grid = {
-        'max_depth': [3, 4, 5, 6],                  # Profondità degli alberi
-        'learning_rate': [0.01, 0.03, 0.05, 0.1],     # Velocità di apprendimento
-        'n_estimators': [50, 100, 200],               # Numero di alberi
-        'subsample': [0.8, 1.0]                       # Frazione di dati da usare per albero (evita overfitting)
+        'max_depth': [3, 4, 5, 6],                  
+        'learning_rate': [0.01, 0.03, 0.05, 0.1],     
+        'n_estimators': [50, 100, 200],               
+        'subsample': [0.8, 1.0]                       
     }
 
     print("\nInizializzazione di GridSearchCV...")
-    # Usiamo XGBClassifier di base
     xgb_base = XGBClassifier(eval_metric='logloss', random_state=42)
 
-    # Configuriamo la ricerca: 
-    # cv=5 significa 5-fold cross-validation
-    # scoring='neg_log_loss' perché vogliamo minimizzare la log loss
     grid_search = GridSearchCV(
         estimator=xgb_base,
         param_grid=param_grid,
         scoring='neg_log_loss',
         cv=5,
         verbose=1,
-        n_jobs=-1 # Sfrutta tutti i core della CPU
+        n_jobs=-1 
     )
 
     print("Ricerca dei parametri ottimali in corso (potrebbe richiedere qualche secondo)...")
@@ -73,6 +71,28 @@ def main():
     print("\n--- Performance Modello Ottimizzato (Test Set) ---")
     print(f"Log Loss: {loss:.4f}")
     print(f"ROC-AUC:  {auc:.4f}")
+
+    # --- 4. PLOT DELLA CURVA ROC-AUC ---
+    print("\nGenerazione del grafico della curva ROC...")
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    RocCurveDisplay.from_predictions(
+        y_test, 
+        preds_proba, 
+        name="XGBoost xG Spaziale",
+        ax=ax
+    )
+    
+    plt.plot([0, 1], [0, 1], color="navy", lw=2, linestyle="--", label="Caso Casuale (AUC = 0.5)")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Tasso di Falsi Positivi (1 - Specificità)", fontsize=11)
+    plt.ylabel("Tasso di Veri Positivi (Sensibilità)", fontsize=11)
+    plt.title(f"Curva ROC - Modello xG Spaziale (AUC = {auc:.4f})", fontsize=13, fontweight='bold')
+    plt.legend(loc="lower right")
+    plt.grid(alpha=0.3)
+    
+    plt.show()
 
 if __name__ == "__main__":
     main()
