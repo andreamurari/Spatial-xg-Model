@@ -7,19 +7,18 @@ from statsbombpy.api_client import NoAuthWarning
 
 warnings.simplefilter('ignore', NoAuthWarning)
 
-"""competitions = sb.competitions()
-competitions.to_csv("competitions.csv", index=False)"""
-
 GOALPOST_1 = (120, 36)
 GOALPOST_2 = (120, 44)
 PLAYER_RADIUS = 0.6 
 
-def calculate_spatial_features(shot_x, shot_y, shot_frame):
+def calculate_spatial_and_pressure_features(shot_x, shot_y, shot_frame):
     goal_x, goal_y = 120.0, 40.0
+    
+    # 1. Distanza e Angolo
     distance = math.sqrt((goal_x - shot_x)**2 + (goal_y - shot_y)**2)
     
     if shot_x >= 120:
-        return distance, 0.0, 0, False
+        return distance, 0.0, 0, False, 99.0 # 99 yard = nessun difensore vicino
         
     v1_x, v1_y = 120.0 - shot_x, 36.0 - shot_y
     v2_x, v2_y = 120.0 - shot_x, 44.0 - shot_y
@@ -38,55 +37,53 @@ def calculate_spatial_features(shot_x, shot_y, shot_frame):
 
     defenders_in_cone = 0
     gk_in_cone = False
+    min_defender_distance = 99.0 # Valore iniziale alto
 
     for _, player in shot_frame.iterrows():
         if not player['teammate']:
             player_loc = player['location']
             player_point = Point(player_loc[0], player_loc[1])
-            player_area = player_point.buffer(PLAYER_RADIUS)
             
+            # Calcoliamo la distanza euclidea pura dal pallone al difensore (Pressione)
+            dist_to_ball = ball_point.distance(player_point)
+            if dist_to_ball < min_defender_distance:
+                min_defender_distance = dist_to_ball
+            
+            # Controllo cono e volume (come prima)
+            player_area = player_point.buffer(PLAYER_RADIUS)
             if shooting_cone.intersects(player_area):
                 if player.get('keeper', False):
                     gk_in_cone = True
                 else:
                     defenders_in_cone += 1
                     
-    return distance, angle_deg, defenders_in_cone, gk_in_cone
+    return distance, angle_deg, defenders_in_cone, gk_in_cone, min_defender_distance
 
 def main():
-    # Esempio: Mondiali 2022 (competition_id=43, season_id=106)
-    # Sostituisci con i codici della competizione che preferisci
-    COMP_ID = 53
-    SEASON_IDS = [315, 106] # Nota: usa una lista di interi
+    COMP_ID = 55 # Sostituisci con l'ID competizione desiderato
+    SEASON_IDS = [282, 43] 
     
     all_matches_list = []
-    
     for s_id in SEASON_IDS:
-        print(f"Recupero le partite per la competizione {COMP_ID}, stagione {s_id}...")
         try:
             matches_df = sb.matches(competition_id=COMP_ID, season_id=s_id)
             all_matches_list.append(matches_df)
         except Exception as e:
-            print(f"Stagione {s_id} non disponibile o errore: {e}")
+            print(f"Errore stagione {s_id}: {e}")
             
-    # Uniamo tutte le stagioni in un unico DataFrame di partite
-    if all_matches_list:
-        matches_df = pd.concat(all_matches_list, ignore_index=True)
-        match_ids = matches_df['match_id'].tolist()
-        print(f"\nTrovate {len(match_ids)} partite totali tra le stagioni selezionate.")
-    else:
-        print("Nessuna partita trovata per le stagioni indicate.")
-        match_ids = []
-
-    print(izio := f"Trovate {len(match_ids)} partite. Inizio estrazione dati a 360°...")
+    if not all_matches_list:
+        return
+        
+    matches_df = pd.concat(all_matches_list, ignore_index=True)
+    match_ids = matches_df['match_id'].tolist()
+    print(f"Trovate {len(match_ids)} partite. Inizio estrazione feature avanzate...")
     
     dataset = []
     
     for i, m_id in enumerate(match_ids):
-        print(f"Elaborazione match {i+1}/{len(match_ids)} (ID: {m_id})...")
         try:
-            events_df = sb.events(match_id=m_id)
             frames_360_df = sb.frames(match_id=m_id, fmt='dataframe')
+            events_df = sb.events(match_id=m_id)
             shots = events_df[events_df['type'] == 'Shot'].copy()
             
             for _, shot in shots.iterrows():
@@ -97,11 +94,13 @@ def main():
                 if shot_frame.empty:
                     continue
                     
-                dist, angle, defs, gk = calculate_spatial_features(
+                dist, angle, defs, gk, min_def_dist = calculate_spatial_and_pressure_features(
                     shot_location[0], shot_location[1], shot_frame
                 )
                 
                 is_goal = 1 if shot.get('shot_outcome') == 'Goal' else 0
+                body_part = shot.get('shot_body_part', 'Other')
+                shot_type = shot.get('shot_type', 'Open Play')
                 
                 dataset.append({
                     'match_id': m_id,
@@ -110,18 +109,19 @@ def main():
                     'angolo': angle,
                     'difensori_cono': defs,
                     'portiere_cono': int(gk),
+                    'distanza_min_difensore': min_def_dist, # Nuova feature di pressione
+                    'body_part': body_part,
+                    'shot_type': shot_type,
                     'goal': is_goal
                 })
-        except Exception as e:
-            print(f"Saltata partita {m_id} per errore: {e}")
+            print(f"[{i+1}/{len(match_ids)}] Match {m_id}: Elaborato.")
+        except Exception:
+            print(f"[{i+1}/{len(match_ids)}] Match {m_id}: Dati 360 non disponibili.")
 
-    # Creazione del Dataset Finale
-    final_df = pd.DataFrame(dataset)
-    print(f"\nDataset completato! Raccolti {len(final_df)} tiri totali.")
-    
-    # Salvataggio in CSV per usi futuri senza riscaricare tutto
-    final_df.to_csv("dataset_xg_spaziale_female.csv", index=False)
-    print("Dataset salvato in 'dataset_xg_spaziale_female.csv'.")
+    if dataset:
+        final_df = pd.DataFrame(dataset)
+        final_df.to_csv("dataset_xg_spaziale_male.csv", index=False)
+        print(f"\nDataset avanzato salvato! Raccolti {len(final_df)} tiri.")
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@ import warnings
 warnings.simplefilter('ignore')
 
 def main():
-    print("Caricamento del dataset maschile...")
+    print("Caricamento del dataset...")
     try:
         df_male = pd.read_csv("dataset_xg_spaziale_male.csv")
     except FileNotFoundError:
