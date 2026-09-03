@@ -233,10 +233,16 @@ def main():
     # male
     #COMP_ID = 55
     #SEASON_IDS = [282, 43]
-
+    # DS_NAME = "dataset_xg_male.csv"
+    
+    DS_NAME = "dataset_xg_male_wc.csv"
+    COMP_ID = 43
+    SEASON_IDS = [106]
+    
     # female
-    COMP_ID = 53
-    SEASON_IDS = [315, 106]
+    # COMP_ID = 53
+    # SEASON_IDS = [315, 106]
+    # DS_NAME = "dataset_xg_female.csv"
 
     all_matches_list = []
     for s_id in SEASON_IDS:
@@ -320,7 +326,7 @@ def main():
 
     if dataset:
         final_df = pd.DataFrame(dataset)
-        final_df.to_csv("dataset_xg_female.csv", index=False)
+        final_df.to_csv(DS_NAME, index=False)
         print(f"\nDataset avanzato salvato! Raccolti {len(final_df)} tiri.")
         print(f"Colonne totali: {len(final_df.columns)}")
 
