@@ -27,8 +27,8 @@ endorsed by StatsBomb.
 | --- | --- |
 | `dataset_extractor.py` | Extracts and engineers shot-level datasets. |
 | `xG_computation.py` | Trains and saves `xg_spatial_model_male.pkl`. |
-| `data_analysis.py` | Scores the datasets and prints a comparison table. |
-| `grid_search.py` | Searches model hyperparameters. |
+| `data_analysis.py` | Scores the datasets and prints a comparison table plus a per-dataset calibration report (reliability bins + Brier score). |
+| `grid_search.py` | Searches model hyperparameters (`RandomizedSearchCV` over depth, learning rate, subsampling and explicit regularization — `gamma`, `min_child_weight`, `reg_lambda`/`reg_alpha`, `colsample_bytree`). |
 | `model_config.py` | Stores the selected hyperparameters. |
 | `webapp/` | Flask web app (Explorer + Dashboard) — see [Web app](#web-app) below. |
 | `dataset_xg_*.csv` | Prepared datasets used by the pipeline. |

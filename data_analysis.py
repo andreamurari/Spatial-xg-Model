@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 import joblib
 import warnings
+from sklearn.metrics import brier_score_loss
 
 warnings.simplefilter('ignore')
 
@@ -57,6 +58,12 @@ def get_metrics(df):
     pred_conv_model = (total_xg_model / shots) * 100 if shots > 0 else 0.0
     pred_conv_sb = (total_xg_sb / shots) * 100 if shots > 0 and total_xg_sb > 0 else 0.0
 
+    # Brier score: mean squared error between predicted probability and the
+    # actual 0/1 outcome. Lower is better; 0 is perfect, ~0.09 is what you'd
+    # get by always predicting the dataset's overall goal rate (~10%), so
+    # that's the number a calibrated-but-uninformative model would score.
+    brier = float(brier_score_loss(df['goal'], df['predicted_xg'])) if shots > 0 else None
+
     return {
         'shots': shots,
         'goals': goals,
@@ -66,6 +73,7 @@ def get_metrics(df):
         'real_conversion': real_conv,
         'model_conversion': pred_conv_model,
         'sb_conversion': pred_conv_sb if total_xg_sb > 0 else None,
+        'brier_score': brier,
     }
 
 
@@ -136,6 +144,33 @@ def comparison_table(results):
     })
 
 
+def print_calibration_report(results):
+    """Reliability table (predicted xG vs. actual goal rate per bin) plus a
+    Brier score per dataset. Discrimination (AUC) tells you if the model can
+    rank shots; this tells you if the probabilities it outputs can be taken
+    at face value, which is the entire point of an xG number.
+    """
+    print("\n" + "=" * 85)
+    print("       MODEL CALIBRATION (predicted xG vs. actual goal rate)")
+    print("=" * 85)
+
+    for label, r in results.items():
+        metrics = r['metrics']
+        bins = r['calibration']
+        print(f"\n--- {label} (Brier score: {metrics['brier_score']:.4f}, "
+              f"lower is better; 0 = perfect) ---")
+        if not bins:
+            print("  Not enough shots to bin.")
+            continue
+        bin_df = pd.DataFrame(bins)
+        bin_df.insert(0, 'bin', range(1, len(bin_df) + 1))
+        bin_df['diff'] = bin_df['actual'] - bin_df['predicted']
+        bin_df.columns = ['Bin', 'Predicted xG', 'Actual Goal Rate', 'Shots', 'Actual - Predicted']
+        print(bin_df.to_string(index=False))
+
+    print("\n" + "=" * 85)
+
+
 def main():
     print("Caricamento del modello salvato (.pkl) e dei dataset di confronto...")
     try:
@@ -149,6 +184,8 @@ def main():
     print("=" * 85)
     print(comparison_table(results).to_string(index=False))
     print("=" * 85)
+
+    print_calibration_report(results)
 
 
 if __name__ == "__main__":
