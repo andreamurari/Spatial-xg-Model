@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spatial xG Explorer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <div>
+        <h1>Spatial xG Explorer</h1>
+        <p>Place a shot, shape the defence, see the model think — built on StatsBomb 360 data.</p>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a class="nav-link active" href="{{ url_for('index') }}">Explorer</a>
+      <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <!-- ================= PITCH ================= -->
+    <section class="card pitch-card">
+      <div class="pitch-toolbar">
+        <div class="mode-group" role="group" aria-label="Placement mode">
+          <button type="button" class="mode-btn active" data-mode="ball">
+            <span class="dot dot-ball"></span> Shot
+          </button>
+          <button type="button" class="mode-btn" data-mode="defender">
+            <span class="dot dot-defender"></span> Defender
+          </button>
+          <button type="button" class="mode-btn" data-mode="keeper">
+            <span class="dot dot-keeper"></span> Goalkeeper
+          </button>
+        </div>
+        <button type="button" id="reset-btn" class="ghost-btn">Reset</button>
+      </div>
+
+      <p class="hint" id="hint">Click the pitch to place the shot.</p>
+
+      <svg id="pitch" viewBox="-4 -4 128 88" preserveAspectRatio="xMidYMid meet">
+        <rect x="-4" y="-4" width="128" height="88" class="pitch-grass" />
+        <!-- outer boundary -->
+        <rect x="0" y="0" width="120" height="80" class="pitch-line" />
+        <!-- halfway line + centre circle -->
+        <line x1="60" y1="0" x2="60" y2="80" class="pitch-line" />
+        <circle cx="60" cy="40" r="10" class="pitch-line" />
+        <circle cx="60" cy="40" r="0.35" class="pitch-spot" />
+
+        <!-- right (attacking) penalty area -->
+        <rect x="102" y="18" width="18" height="44" class="pitch-line" />
+        <rect x="114" y="30" width="6" height="20" class="pitch-line" />
+        <circle cx="108" cy="40" r="0.35" class="pitch-spot" />
+        <path d="M 102 32 A 10 10 0 0 0 102 48" class="pitch-line" />
+        <rect x="120" y="36" width="1.6" height="8" class="pitch-goal" />
+
+        <!-- left (defensive) penalty area -->
+        <rect x="0" y="18" width="18" height="44" class="pitch-line" />
+        <rect x="0" y="30" width="6" height="20" class="pitch-line" />
+        <circle cx="12" cy="40" r="0.35" class="pitch-spot" />
+        <path d="M 18 32 A 10 10 0 0 1 18 48" class="pitch-line" />
+        <rect x="-1.6" y="36" width="1.6" height="8" class="pitch-goal" />
+
+        <!-- corner arcs -->
+        <path d="M 120 2 A 2 2 0 0 1 118 0" class="pitch-line" />
+        <path d="M 118 80 A 2 2 0 0 1 120 78" class="pitch-line" />
+        <path d="M 0 2 A 2 2 0 0 0 2 0" class="pitch-line" />
+        <path d="M 2 80 A 2 2 0 0 0 0 78" class="pitch-line" />
+
+        <g id="cone-layer"></g>
+        <g id="markers-layer"></g>
+      </svg>
+
+      <div class="legend">
+        <span><i class="dot dot-ball"></i> Shot location</span>
+        <span><i class="dot dot-defender"></i> Defender (click to remove)</span>
+        <span><i class="dot dot-keeper"></i> Goalkeeper (click to remove)</span>
+      </div>
+    </section>
+
+    <!-- ================= CONTROLS + RESULT ================= -->
+    <section class="side">
+      <div class="card result-card">
+        <div id="result-empty" class="result-empty">Place a shot on the pitch to compute xG.</div>
+        <div id="result-body" class="result-body hidden">
+          <div class="xg-value"><span id="xg-number">0.00</span></div>
+          <div class="xg-meter"><div id="xg-fill" class="xg-fill"></div></div>
+          <div class="xg-label">Expected Goals (this shot)</div>
+          <dl class="stat-grid">
+            <div><dt>Distance</dt><dd id="stat-distance">–</dd></div>
+            <div><dt>Shot angle</dt><dd id="stat-angle">–</dd></div>
+            <div><dt>Free angle</dt><dd id="stat-free-angle">–</dd></div>
+            <div><dt>Defenders in cone</dt><dd id="stat-defenders">–</dd></div>
+            <div><dt>Closest defender</dt><dd id="stat-min-def">–</dd></div>
+            <div><dt>GK blocking angle</dt><dd id="stat-gk-cone">–</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <form class="card controls-card" id="controls">
+        <details open>
+          <summary>Shot details</summary>
+          <div class="grid-2">
+            <label>Body part
+              <select name="body_part">
+                {% for v in choices.body_part %}<option value="{{ v }}" {% if v=='Right Foot' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Shot type
+              <select name="shot_type">
+                {% for v in choices.shot_type %}<option value="{{ v }}" {% if v=='Open Play' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Technique
+              <select name="shot_technique">
+                {% for v in choices.shot_technique %}<option value="{{ v }}" {% if v=='Normal' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Play pattern
+              <select name="play_pattern">
+                {% for v in choices.play_pattern %}<option value="{{ v }}" {% if v=='Regular Play' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="span-2">Shooter position
+              <select name="position_tiratore">
+                {% for v in choices.position_tiratore %}<option value="{{ v }}" {% if v=='Center Forward' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle"><input type="checkbox" name="primo_tocco"> First-time shot</label>
+            <label class="toggle"><input type="checkbox" name="porta_sguarnita"> Open goal</label>
+            <label class="toggle"><input type="checkbox" name="tiro_deviato"> Deflected</label>
+            <label class="toggle"><input type="checkbox" name="sotto_pressione"> Under pressure</label>
+          </div>
+        </details>
+
+        <details>
+          <summary>Assist</summary>
+          <label class="toggle"><input type="checkbox" name="has_assist" id="has-assist"> This shot follows a key pass</label>
+          <div id="assist-fields" class="grid-2 hidden">
+            <label>Pass height
+              <select name="assist_altezza">
+                {% for v in choices.assist_altezza %}<option value="{{ v }}" {% if v=='Ground Pass' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Pass technique
+              <select name="assist_tecnica">
+                {% for v in choices.assist_tecnica %}<option value="{{ v }}" {% if v=='Straight' %}selected{% endif %}>{{ v }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="span-2">Pass length: <span id="assist-len-out">20</span> yd
+              <input type="range" name="assist_lunghezza" min="1" max="60" value="20">
+            </label>
+            <div class="toggle-row span-2">
+              <label class="toggle"><input type="checkbox" name="assist_cross"> Cross</label>
+              <label class="toggle"><input type="checkbox" name="assist_cutback"> Cutback</label>
+              <label class="toggle"><input type="checkbox" name="assist_through_ball"> Through ball</label>
+            </div>
+          </div>
+        </details>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img class="footer-logo" src="{{ url_for('static', filename='img/statsbomb-logo.png') }}" alt="StatsBomb">
+    <p>Independent research project · not affiliated with StatsBomb · data used under the
+    <a href="https://github.com/statsbomb/open-data/blob/master/LICENSE.pdf" target="_blank" rel="noopener">StatsBomb Open Data terms</a>.</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

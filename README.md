@@ -30,6 +30,7 @@ endorsed by StatsBomb.
 | `data_analysis.py` | Scores the datasets and prints a comparison table. |
 | `grid_search.py` | Searches model hyperparameters. |
 | `model_config.py` | Stores the selected hyperparameters. |
+| `webapp/` | Flask web app (Explorer + Dashboard) — see [Web app](#web-app) below. |
 | `dataset_xg_*.csv` | Prepared datasets used by the pipeline. |
 | `competitions.csv` | Competition and season selections. |
 
@@ -38,7 +39,7 @@ endorsed by StatsBomb.
 Python 3.10 or newer is recommended. Install the packages used by the scripts:
 
 ```bash
-python -m pip install pandas shapely statsbombpy xgboost scikit-learn joblib
+python -m pip install pandas shapely statsbombpy xgboost scikit-learn joblib flask
 ```
 
 ## Usage
@@ -50,6 +51,33 @@ python dataset_extractor.py
 python xG_computation.py
 python data_analysis.py
 ```
+
+## Web app
+
+Everything for the web app — `app.py`, `templates/`, `static/` — is packaged
+under `webapp/`, separate from the ML pipeline scripts at the repository
+root. It serves two pages:
+
+- **Explorer** (`/`) — click a football pitch to place a shot, drag on
+  defenders and a goalkeeper, tweak the shot/assist details, and the app
+  calls `xg_spatial_model_male.pkl` to compute a live xG value. The feature
+  engineering reuses the same distance/angle and unobstructed-shooting-angle
+  formulas as `dataset_extractor.py`, so predictions stay consistent with how
+  the training data was built.
+- **Dashboard** (`/dashboard`) — a visual version of what `data_analysis.py`
+  prints on the CLI: per-dataset KPI cards, a conversion-rate comparison
+  chart (real vs. our model vs. StatsBomb), and the full comparison table.
+
+```bash
+python webapp/app.py
+```
+
+Then open http://127.0.0.1:5000 in a browser. `webapp/app.py` imports
+`data_analysis.py` from the project root, so run it from anywhere — paths are
+resolved relative to the repository, not the working directory. The Explorer
+requires `xg_spatial_model_male.pkl` to already exist (see Usage above); the
+Dashboard additionally requires the three `dataset_xg_*.csv` files used by
+`data_analysis.py`.
 
 The extraction step may require network access to StatsBomb Open Data. The
 training step writes a local model file, which is intentionally not part of the

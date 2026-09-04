@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spatial xG Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <div>
+        <h1>Model Dashboard</h1>
+        <p>How the trained model scores against the StatsBomb xG benchmark — the numbers from <code>data_analysis.py</code>.</p>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a class="nav-link" href="{{ url_for('index') }}">Explorer</a>
+      <a class="nav-link active" href="{{ url_for('dashboard') }}">Dashboard</a>
+    </nav>
+  </header>
+
+  <main class="dash-layout">
+    {% if error %}
+    <div class="card">
+      <p class="dash-error">Couldn't load the comparison data: {{ error }}</p>
+      <p class="hint">Run <code>python dataset_extractor.py</code> and <code>python xG_computation.py</code> first, then reload this page.</p>
+    </div>
+    {% else %}
+
+    <!-- ================= KPI CARDS ================= -->
+    <section class="kpi-grid">
+      {% for ds in data.datasets %}
+      <div class="card kpi-card" style="--series-color: var(--series-{{ loop.index }})">
+        <div class="kpi-title"><span class="series-dot"></span>{{ ds.label }}</div>
+        <div class="kpi-main">
+          <div class="kpi-stat"><span class="kpi-value">{{ ds.metrics.shots }}</span><span class="kpi-key">shots</span></div>
+          <div class="kpi-stat"><span class="kpi-value">{{ ds.metrics.goals }}</span><span class="kpi-key">goals</span></div>
+        </div>
+        <dl class="kpi-mini">
+          <div><dt>xG (our model)</dt><dd>{{ "%.1f"|format(ds.metrics.total_xg_model) }}</dd></div>
+          <div><dt>xG (StatsBomb)</dt><dd>{{ "%.1f"|format(ds.metrics.total_xg_sb) }}</dd></div>
+          <div><dt>Avg. shot distance</dt><dd>{{ "%.1f"|format(ds.metrics.avg_distance) }} yd</dd></div>
+        </dl>
+      </div>
+      {% endfor %}
+    </section>
+
+    <!-- ================= CONVERSION CHART ================= -->
+    <section class="card chart-card">
+      <h2>Conversion rate: real vs. predicted</h2>
+      <p class="chart-sub">Goals per shot, actual vs. what each xG model would predict on average.</p>
+      <div id="conversion-chart" class="chart-box"></div>
+      <div id="conversion-legend" class="chart-legend"></div>
+    </section>
+
+    <!-- ================= FULL TABLE ================= -->
+    <section class="card">
+      <h2>Full comparison table</h2>
+      <div class="table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              {% for col in data.table_columns %}<th>{{ col }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in data.table_rows %}
+            <tr>
+              {% for col in data.table_columns %}
+                <td class="{{ 'metric-name' if col == 'Metric' else 'metric-value' }}">{{ row[col] }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <script>
+      window.DASHBOARD_DATA = {{ data.datasets | tojson }};
+    </script>
+    {% endif %}
+  </main>
+
+  <footer class="footer">
+    <img class="footer-logo" src="{{ url_for('static', filename='img/statsbomb-logo.png') }}" alt="StatsBomb">
+    <p>Independent research project · not affiliated with StatsBomb · data used under the
+    <a href="https://github.com/statsbomb/open-data/blob/master/LICENSE.pdf" target="_blank" rel="noopener">StatsBomb Open Data terms</a>.</p>
+  </footer>
+
+  {% if not error %}<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endif %}
+</body>
+</html>
