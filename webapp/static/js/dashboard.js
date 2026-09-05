@@ -35,9 +35,10 @@
     ];
 
     const W = 640, H = 340;
-    const margin = { top: 16, right: 16, bottom: 56, left: 56 };
+    const margin = { top: 26, right: 16, bottom: 56, left: 56 };
     const innerW = W - margin.left - margin.right;
     const innerH = H - margin.top - margin.bottom;
+    const MAX_BAR_WIDTH = 34;
 
     const allValues = DATA.flatMap((d) =>
       seriesDefs.map((s) => d.metrics[s.key]).filter((v) => v !== null && v !== undefined)
@@ -62,13 +63,18 @@
 
     const groupWidth = innerW / DATA.length;
     const barGap = 3;
-    const barWidth = (groupWidth - barGap * (seriesDefs.length + 1)) / seriesDefs.length;
+    const barWidth = Math.min(
+      (groupWidth - barGap * (seriesDefs.length + 1)) / seriesDefs.length,
+      MAX_BAR_WIDTH
+    );
+    const barsWidth = barWidth * seriesDefs.length + barGap * (seriesDefs.length - 1);
 
     DATA.forEach((d, gi) => {
       const groupX = gi * groupWidth;
+      const barsStartX = groupX + (groupWidth - barsWidth) / 2;
       seriesDefs.forEach((s, si) => {
         const value = d.metrics[s.key];
-        const x = groupX + barGap + si * (barWidth + barGap);
+        const x = barsStartX + si * (barWidth + barGap);
         if (value === null || value === undefined) {
           el(
             "text",
@@ -91,6 +97,16 @@
           g
         );
         el("title", {}, rect).textContent = `${d.label} · ${s.name}: ${value.toFixed(2)}%`;
+        el(
+          "text",
+          {
+            x: x + barWidth / 2,
+            y: innerH - barH - 6,
+            class: "chart-value-label",
+            "text-anchor": "middle",
+          },
+          g
+        ).textContent = value.toFixed(1);
       });
       el(
         "text",

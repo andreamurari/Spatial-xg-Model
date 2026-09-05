@@ -54,6 +54,10 @@ python data_analysis.py
 
 ## Web app
 
+🔗 **Live demo:** [spatial-xg-model.onrender.com](https://spatial-xg-model.onrender.com)
+(hosted on Render's free tier — it sleeps after inactivity, so the first
+request after a while can take 30–60s to wake up)
+
 Everything for the web app — `app.py`, `templates/`, `static/` — is packaged
 under `webapp/`, separate from the ML pipeline scripts at the repository
 root. It serves two pages:
